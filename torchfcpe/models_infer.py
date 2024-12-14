@@ -3,7 +3,9 @@ import pathlib
 
 import torch
 from einops import rearrange
+
 from torchfcpe.f02midi.transpose import f02midi
+
 from .models import CFNaiveMelPE
 from .tools import (
     DotDict,
@@ -212,11 +214,13 @@ class InferCFNaiveMelPE(torch.nn.Module):
         if f0_max is not None:
             f0[f0 > f0_max] = f0_max
         if output_interp_target_length is not None:
+            f0 = torch.where(f0 == 0, float("nan"), f0)
             f0 = torch.nn.functional.interpolate(
                 f0.transpose(1, 2),
                 size=int(output_interp_target_length),
-                mode="nearest",
+                mode="linear",
             ).transpose(1, 2)
+            f0 = torch.where(f0.isnan(), float(0.0), f0)
         # if return_uv is True, interp and return uv
         if return_uv:
             uv = torch.nn.functional.interpolate(
@@ -250,7 +254,6 @@ class InferCFNaiveMelPE(torch.nn.Module):
         f0 = f0.squeeze(-1).squeeze(0).cpu().numpy()
         wav = wav.squeeze(0).squeeze(-1).cpu().numpy()
         return f02midi(f0, tempo=tempo, output_path=output_path, sr=sr, y=wav)
-
 
     def get_hop_size(self) -> int:
         """Get hop size"""
